@@ -48,7 +48,6 @@ type detector struct {
 }
 
 func NewDetector(httpClient *http.Client, host string) Detector {
-	// cachedClient := api.NewCachedClient(httpClient, time.Hour*48)
 	return &detector{
 		httpClient: httpClient,
 		host:       host,
