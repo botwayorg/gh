@@ -25,7 +25,7 @@ import (
 )
 
 type hostConfig interface {
-	DefaultHost() (string, error)
+	DefaultHost() (string, string)
 }
 
 type StatusOptions struct {
@@ -614,10 +614,7 @@ func statusRun(opts *StatusOptions) error {
 		return fmt.Errorf("could not create client: %w", err)
 	}
 
-	hostname, err := opts.HostConfig.DefaultHost()
-	if err != nil {
-		return err
-	}
+	hostname, _ := opts.HostConfig.DefaultHost()
 
 	sg := NewStatusGetter(client, hostname, opts)
 

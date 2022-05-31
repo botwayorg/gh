@@ -119,10 +119,7 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	host, err := cfg.DefaultHost()
-	if err != nil {
-		return err
-	}
+	host, _ := cfg.DefaultHost()
 
 	if opts.Detector == nil {
 		opts.Detector = fd.NewDetector(httpClient, host)

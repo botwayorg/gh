@@ -5,7 +5,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -13,15 +12,9 @@ import (
 )
 
 func Test_BaseRepo(t *testing.T) {
-	orig_GH_HOST := os.Getenv("GH_HOST")
-	t.Cleanup(func() {
-		os.Setenv("GH_HOST", orig_GH_HOST)
-	})
-
 	tests := []struct {
 		name       string
 		remotes    git.RemoteSet
-		config     config.Config
 		override   string
 		wantsErr   bool
 		wantsName  string
@@ -33,7 +26,6 @@ func Test_BaseRepo(t *testing.T) {
 			remotes: git.RemoteSet{
 				git.NewRemote("origin", "https://nonsense.com/owner/repo.git"),
 			},
-			config:     defaultConfig(),
 			wantsName:  "repo",
 			wantsOwner: "owner",
 			wantsHost:  "nonsense.com",
@@ -43,7 +35,6 @@ func Test_BaseRepo(t *testing.T) {
 			remotes: git.RemoteSet{
 				git.NewRemote("origin", "https://test.com/owner/repo.git"),
 			},
-			config:   defaultConfig(),
 			wantsErr: true,
 		},
 		{
@@ -51,7 +42,6 @@ func Test_BaseRepo(t *testing.T) {
 			remotes: git.RemoteSet{
 				git.NewRemote("origin", "https://test.com/owner/repo.git"),
 			},
-			config:     defaultConfig(),
 			override:   "test.com",
 			wantsName:  "repo",
 			wantsOwner: "owner",
@@ -62,7 +52,6 @@ func Test_BaseRepo(t *testing.T) {
 			remotes: git.RemoteSet{
 				git.NewRemote("origin", "https://nonsense.com/owner/repo.git"),
 			},
-			config:   defaultConfig(),
 			override: "test.com",
 			wantsErr: true,
 		},
@@ -71,9 +60,9 @@ func Test_BaseRepo(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.override != "" {
+				old := os.Getenv("GH_HOST")
 				os.Setenv("GH_HOST", tt.override)
-			} else {
-				os.Unsetenv("GH_HOST")
+				defer os.Setenv("GH_HOST", old)
 			}
 			f := New("1")
 			rr := &remoteResolver{
@@ -81,7 +70,7 @@ func Test_BaseRepo(t *testing.T) {
 					return tt.remotes, nil
 				},
 				getConfig: func() (config.Config, error) {
-					return tt.config, nil
+					return defaultConfig(), nil
 				},
 			}
 			f.Remotes = rr.Resolver()
@@ -101,15 +90,10 @@ func Test_BaseRepo(t *testing.T) {
 
 func Test_SmartBaseRepo(t *testing.T) {
 	pu, _ := url.Parse("https://test.com/newowner/newrepo.git")
-	orig_GH_HOST := os.Getenv("GH_HOST")
-	t.Cleanup(func() {
-		os.Setenv("GH_HOST", orig_GH_HOST)
-	})
 
 	tests := []struct {
 		name       string
 		remotes    git.RemoteSet
-		config     config.Config
 		override   string
 		wantsErr   bool
 		wantsName  string
@@ -121,7 +105,6 @@ func Test_SmartBaseRepo(t *testing.T) {
 			remotes: git.RemoteSet{
 				git.NewRemote("origin", "https://test.com/owner/repo.git"),
 			},
-			config:     defaultConfig(),
 			override:   "test.com",
 			wantsName:  "repo",
 			wantsOwner: "owner",
@@ -135,7 +118,6 @@ func Test_SmartBaseRepo(t *testing.T) {
 					FetchURL: pu,
 					PushURL:  pu},
 			},
-			config:     defaultConfig(),
 			override:   "test.com",
 			wantsName:  "newrepo",
 			wantsOwner: "newowner",
@@ -149,7 +131,6 @@ func Test_SmartBaseRepo(t *testing.T) {
 					FetchURL: pu,
 					PushURL:  pu},
 			},
-			config:     defaultConfig(),
 			override:   "test.com",
 			wantsName:  "test",
 			wantsOwner: "johnny",
@@ -160,7 +141,6 @@ func Test_SmartBaseRepo(t *testing.T) {
 			remotes: git.RemoteSet{
 				git.NewRemote("origin", "https://example.com/owner/repo.git"),
 			},
-			config:   defaultConfig(),
 			override: "test.com",
 			wantsErr: true,
 		},
@@ -169,9 +149,9 @@ func Test_SmartBaseRepo(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.override != "" {
+				old := os.Getenv("GH_HOST")
 				os.Setenv("GH_HOST", tt.override)
-			} else {
-				os.Unsetenv("GH_HOST")
+				defer os.Setenv("GH_HOST", old)
 			}
 			f := New("1")
 			rr := &remoteResolver{
@@ -179,7 +159,7 @@ func Test_SmartBaseRepo(t *testing.T) {
 					return tt.remotes, nil
 				},
 				getConfig: func() (config.Config, error) {
-					return tt.config, nil
+					return defaultConfig(), nil
 				},
 			}
 			f.Remotes = rr.Resolver()
@@ -199,11 +179,6 @@ func Test_SmartBaseRepo(t *testing.T) {
 
 // Defined in pkg/cmdutil/repo_override.go but test it along with other BaseRepo functions
 func Test_OverrideBaseRepo(t *testing.T) {
-	orig_GH_HOST := os.Getenv("GH_REPO")
-	t.Cleanup(func() {
-		os.Setenv("GH_REPO", orig_GH_HOST)
-	})
-
 	tests := []struct {
 		name        string
 		remotes     git.RemoteSet
@@ -244,9 +219,9 @@ func Test_OverrideBaseRepo(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.envOverride != "" {
+				old := os.Getenv("GH_REPO")
 				os.Setenv("GH_REPO", tt.envOverride)
-			} else {
-				os.Unsetenv("GH_REPO")
+				defer os.Setenv("GH_REPO", old)
 			}
 			f := New("1")
 			rr := &remoteResolver{
@@ -452,12 +427,10 @@ func Test_browserLauncher(t *testing.T) {
 	}
 }
 
-func defaultConfig() config.Config {
-	return config.InheritEnv(config.NewFromString(heredoc.Doc(`
-    hosts:
-      nonsense.com:
-        oauth_token: BLAH
-		`)))
+func defaultConfig() *config.ConfigMock {
+	cfg := config.NewFromString("")
+	cfg.Set("nonsense.com", "oauth_token", "BLAH")
+	return cfg
 }
 
 func pagerConfig() config.Config {
