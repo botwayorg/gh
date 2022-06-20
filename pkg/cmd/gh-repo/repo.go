@@ -12,7 +12,7 @@ import (
 	repoSyncCmd "github.com/botwayorg/gh/pkg/cmd/gh-repo/sync"
 	repoViewCmd "github.com/botwayorg/gh/pkg/cmd/gh-repo/view"
 	"github.com/botwayorg/gh/pkg/cmdutil"
-	"github.com/botwayorg/gh/utils"
+	// "github.com/botwayorg/gh/utils"
 	// git_config "github.com/botwayorg/git"
 	"github.com/spf13/cobra"
 
