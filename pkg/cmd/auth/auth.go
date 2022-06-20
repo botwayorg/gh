@@ -13,9 +13,10 @@ import (
 
 func NewCmdAuth(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "auth <command>",
-		Short: "Login, logout, and refresh your authentication with github.",
-		Long:  `Manage botway's authentication state.`,
+		Use:   "github <command>",
+		Aliases: []string{"gh"},
+		Short: "Login, logout, and refresh your authentication with github",
+		Long:  `Manage botway's authentication state`,
 	}
 
 	cmdutil.DisableAuthCheck(cmd)

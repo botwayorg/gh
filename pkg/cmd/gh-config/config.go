@@ -15,6 +15,7 @@ func NewCmdConfig(f *cmdutil.Factory) *cobra.Command {
 	longDoc := strings.Builder{}
 	longDoc.WriteString("Display or change configuration settings for botway.\n\n")
 	longDoc.WriteString("Current respected settings:\n")
+
 	for _, co := range config.ConfigOptions() {
 		longDoc.WriteString(fmt.Sprintf("- %s: %s", co.Key, co.Description))
 		if co.DefaultValue != "" {
@@ -26,7 +27,7 @@ func NewCmdConfig(f *cmdutil.Factory) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "gh-config <command>",
-		Short: "Manage configuration of github for botway.",
+		Short: "Manage configuration of github for botway",
 		Long:  longDoc.String(),
 	}
 
