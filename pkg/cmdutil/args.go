@@ -1,6 +1,7 @@
 package cmdutil
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -14,20 +15,21 @@ func MinimumArgs(n int, msg string) cobra.PositionalArgs {
 
 	return func(cmd *cobra.Command, args []string) error {
 		if len(args) < n {
-			return FlagErrorf("%s", msg)
+			return &FlagError{Err: errors.New(msg)}
 		}
 		return nil
 	}
 }
 
 func ExactArgs(n int, msg string) cobra.PositionalArgs {
+
 	return func(cmd *cobra.Command, args []string) error {
 		if len(args) > n {
-			return FlagErrorf("too many arguments")
+			return &FlagError{Err: errors.New("too many arguments")}
 		}
 
 		if len(args) < n {
-			return FlagErrorf("%s", msg)
+			return &FlagError{Err: errors.New(msg)}
 		}
 
 		return nil
@@ -55,5 +57,5 @@ func NoArgsQuoteReminder(cmd *cobra.Command, args []string) error {
 		errMsg += "; please quote all values that have spaces"
 	}
 
-	return FlagErrorf("%s", errMsg)
+	return &FlagError{Err: errors.New(errMsg)}
 }

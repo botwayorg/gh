@@ -3,18 +3,18 @@ package login
 import (
 	"errors"
 	"fmt"
-	"io"
+	"io/ioutil"
 	"net/http"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/ghinstance"
-	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
-	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
+	"github.com/botwayorg/gh/core/config"
+	"github.com/botwayorg/gh/core/ghinstance"
+	"github.com/botwayorg/gh/pkg/cmd/auth/shared"
+	"github.com/botwayorg/gh/pkg/cmdutil"
+	"github.com/botwayorg/gh/pkg/iostreams"
+	"github.com/botwayorg/gh/pkg/prompt"
 	"github.com/spf13/cobra"
 )
 
@@ -27,11 +27,10 @@ type LoginOptions struct {
 
 	Interactive bool
 
-	Hostname    string
-	Scopes      []string
-	Token       string
-	Web         bool
-	GitProtocol string
+	Hostname string
+	Scopes   []string
+	Token    string
+	Web      bool
 }
 
 func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Command {
@@ -39,6 +38,8 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 		IO:         f.IOStreams,
 		Config:     f.Config,
 		HttpClient: f.HttpClient,
+
+		MainExecutable: f.Executable,
 	}
 
 	var tokenStdin bool
@@ -46,64 +47,62 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 	cmd := &cobra.Command{
 		Use:   "login",
 		Args:  cobra.ExactArgs(0),
-		Short: "Authenticate with a GitHub host",
+		Short: "Authenticate with a GitHub host.",
 		Long: heredoc.Docf(`
 			Authenticate with a GitHub host.
 
-			The default authentication mode is a web-based browser flow. After completion, an
-			authentication token will be stored internally.
+			The default authentication mode is a web-based browser flow.
 
-			Alternatively, use %[1]s--with-token%[1]s to pass in a token on standard input.
+			Alternatively, pass in a token on standard input by using %[1]s--with-token%[1]s.
 			The minimum required scopes for the token are: "repo", "read:org".
 
-			Alternatively, gh will use the authentication token found in environment variables.
-			This method is most suitable for "headless" use of gh such as in automation. See
-			%[1]sgh help environment%[1]s for more info.
-
-			To use gh in GitHub Actions, add %[1]sGH_TOKEN: ${{secrets.GITHUB_TOKEN}}%[1]s to "env".
+			The --scopes flag accepts a comma separated list of scopes you want your botway credentials to have. If
+			absent, this command ensures that botway has access to a minimum set of scopes.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# start interactive setup
-			$ gh auth login
+			botway login --github
 
 			# authenticate against github.com by reading the token from a file
-			$ gh auth login --with-token < mytoken.txt
+			botway login --github --with-token < mytoken.txt
 
-			# authenticate with a specific GitHub instance
-			$ gh auth login --hostname enterprise.internal
+			# authenticate with a specific GitHub Enterprise Server instance
+			botway login --github --hostname enterprise.internal
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if tokenStdin && opts.Web {
-				return cmdutil.FlagErrorf("specify only one of `--web` or `--with-token`")
+			if !opts.IO.CanPrompt() && !(tokenStdin || opts.Web) {
+				return &cmdutil.FlagError{Err: errors.New("--web or --with-token required when not running interactively")}
 			}
-			if tokenStdin && len(opts.Scopes) > 0 {
-				return cmdutil.FlagErrorf("specify only one of `--scopes` or `--with-token`")
+
+			if tokenStdin && opts.Web {
+				return &cmdutil.FlagError{Err: errors.New("specify only one of --web or --with-token")}
 			}
 
 			if tokenStdin {
 				defer opts.IO.In.Close()
-				token, err := io.ReadAll(opts.IO.In)
+				token, err := ioutil.ReadAll(opts.IO.In)
 				if err != nil {
-					return fmt.Errorf("failed to read token from standard input: %w", err)
+					return fmt.Errorf("failed to read token from STDIN: %w", err)
 				}
 				opts.Token = strings.TrimSpace(string(token))
 			}
 
-			if opts.IO.CanPrompt() && opts.Token == "" {
+			if opts.IO.CanPrompt() && opts.Token == "" && !opts.Web {
 				opts.Interactive = true
 			}
 
 			if cmd.Flags().Changed("hostname") {
 				if err := ghinstance.HostnameValidator(opts.Hostname); err != nil {
-					return cmdutil.FlagErrorf("error parsing hostname: %w", err)
+					return &cmdutil.FlagError{Err: fmt.Errorf("error parsing --hostname: %w", err)}
 				}
 			}
 
-			if opts.Hostname == "" && (!opts.Interactive || opts.Web) {
-				opts.Hostname = ghinstance.Default()
+			if !opts.Interactive {
+				if opts.Hostname == "" {
+					opts.Hostname = ghinstance.Default()
+				}
 			}
 
-			opts.MainExecutable = f.Executable()
 			if runF != nil {
 				return runF(opts)
 			}
@@ -112,11 +111,10 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The hostname of the GitHub instance to authenticate with")
-	cmd.Flags().StringSliceVarP(&opts.Scopes, "scopes", "s", nil, "Additional authentication scopes to request")
+	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "", "", "The hostname of the GitHub instance to authenticate with")
+	cmd.Flags().StringSliceVarP(&opts.Scopes, "scopes", "s", nil, "Additional authentication scopes for botway to have")
 	cmd.Flags().BoolVar(&tokenStdin, "with-token", false, "Read token from standard input")
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open a browser to authenticate")
-	cmdutil.StringEnumFlag(cmd, &opts.GitProtocol, "git-protocol", "p", "", []string{"ssh", "https"}, "The protocol to use for git operations")
 
 	return cmd
 }
@@ -128,11 +126,15 @@ func loginRun(opts *LoginOptions) error {
 	}
 
 	hostname := opts.Hostname
-	if opts.Interactive && hostname == "" {
-		var err error
-		hostname, err = promptForHostname()
-		if err != nil {
-			return err
+	if hostname == "" {
+		if opts.Interactive {
+			var err error
+			hostname, err = promptForHostname()
+			if err != nil {
+				return err
+			}
+		} else {
+			return errors.New("must specify --hostname")
 		}
 	}
 
@@ -140,7 +142,7 @@ func loginRun(opts *LoginOptions) error {
 		var roErr *config.ReadOnlyEnvError
 		if errors.As(err, &roErr) {
 			fmt.Fprintf(opts.IO.ErrOut, "The value of the %s environment variable is being used for authentication.\n", roErr.Variable)
-			fmt.Fprint(opts.IO.ErrOut, "To have GitHub CLI store credentials instead, first clear the value from the environment.\n")
+			fmt.Fprint(opts.IO.ErrOut, "To have botway store credentials instead, first clear the value from the environment.\n")
 			return cmdutil.SilentError
 		}
 		return err
@@ -161,7 +163,7 @@ func loginRun(opts *LoginOptions) error {
 			return fmt.Errorf("error validating token: %w", err)
 		}
 
-		return cfg.WriteHosts()
+		return cfg.Write()
 	}
 
 	existingToken, _ := cfg.Get(hostname, "oauth_token")
@@ -192,7 +194,6 @@ func loginRun(opts *LoginOptions) error {
 		Web:         opts.Web,
 		Scopes:      opts.Scopes,
 		Executable:  opts.MainExecutable,
-		GitProtocol: opts.GitProtocol,
 	})
 }
 

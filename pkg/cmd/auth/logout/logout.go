@@ -7,11 +7,11 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
+	"github.com/botwayorg/gh/api"
+	"github.com/botwayorg/gh/core/config"
+	"github.com/botwayorg/gh/pkg/cmdutil"
+	"github.com/botwayorg/gh/pkg/iostreams"
+	"github.com/botwayorg/gh/pkg/prompt"
 	"github.com/spf13/cobra"
 )
 
@@ -19,7 +19,8 @@ type LogoutOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
-	Hostname   string
+
+	Hostname string
 }
 
 func NewCmdLogout(f *cmdutil.Factory, runF func(*LogoutOptions) error) *cobra.Command {
@@ -32,23 +33,24 @@ func NewCmdLogout(f *cmdutil.Factory, runF func(*LogoutOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "logout",
 		Args:  cobra.ExactArgs(0),
-		Short: "Log out of a GitHub host",
+		Short: "Log out of a GitHub host.",
 		Long: heredoc.Doc(`Remove authentication for a GitHub host.
 
 			This command removes the authentication configuration for a host either specified
 			interactively or via --hostname.
 		`),
 		Example: heredoc.Doc(`
-			$ gh auth logout
+			botway auth logout
 			# => select what host to log out of via a prompt
 
-			$ gh auth logout --hostname enterprise.internal
+			botway auth logout --hostname enterprise.internal
 			# => log out of specified host
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if opts.Hostname == "" && !opts.IO.CanPrompt() {
-				return cmdutil.FlagErrorf("--hostname required when not running interactively")
+				return &cmdutil.FlagError{Err: errors.New("--hostname required when not running interactively")}
 			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -57,7 +59,7 @@ func NewCmdLogout(f *cmdutil.Factory, runF func(*LogoutOptions) error) *cobra.Co
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The hostname of the GitHub instance to log out of")
+	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "", "", "The hostname of the GitHub instance to log out of")
 
 	return cmd
 }
@@ -74,6 +76,7 @@ func logoutRun(opts *LogoutOptions) error {
 	if err != nil {
 		return err
 	}
+
 	if len(candidates) == 0 {
 		return fmt.Errorf("not logged in to any hosts")
 	}
@@ -133,8 +136,23 @@ func logoutRun(opts *LogoutOptions) error {
 		usernameStr = fmt.Sprintf(" account '%s'", username)
 	}
 
+	if opts.IO.CanPrompt() {
+		var keepGoing bool
+		err := prompt.SurveyAskOne(&survey.Confirm{
+			Message: fmt.Sprintf("Are you sure you want to log out of %s%s?", hostname, usernameStr),
+			Default: true,
+		}, &keepGoing)
+		if err != nil {
+			return fmt.Errorf("could not prompt: %w", err)
+		}
+
+		if !keepGoing {
+			return nil
+		}
+	}
+
 	cfg.UnsetHost(hostname)
-	err = cfg.WriteHosts()
+	err = cfg.Write()
 	if err != nil {
 		return fmt.Errorf("failed to write config, authentication configuration not updated: %w", err)
 	}

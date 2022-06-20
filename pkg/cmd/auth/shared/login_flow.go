@@ -3,27 +3,21 @@ package shared
 import (
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/authflow"
-	"github.com/cli/cli/v2/internal/ghinstance"
-	"github.com/cli/cli/v2/pkg/cmd/ssh-key/add"
-	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
-	"github.com/cli/cli/v2/pkg/ssh"
+	"github.com/botwayorg/gh/api"
+	"github.com/botwayorg/gh/core/authflow"
+	"github.com/botwayorg/gh/core/ghinstance"
+	"github.com/botwayorg/gh/pkg/iostreams"
+	"github.com/botwayorg/gh/pkg/prompt"
 )
-
-const defaultSSHKeyTitle = "GitHub CLI"
 
 type iconfig interface {
 	Get(string, string) (string, error)
 	Set(string, string, string) error
 	Write() error
-	WriteHosts() error
 }
 
 type LoginOptions struct {
@@ -35,9 +29,8 @@ type LoginOptions struct {
 	Web         bool
 	Scopes      []string
 	Executable  string
-	GitProtocol string
 
-	sshContext ssh.Context
+	sshContext sshContext
 }
 
 func Login(opts *LoginOptions) error {
@@ -46,8 +39,8 @@ func Login(opts *LoginOptions) error {
 	httpClient := opts.HTTPClient
 	cs := opts.IO.ColorScheme()
 
-	gitProtocol := strings.ToLower(opts.GitProtocol)
-	if opts.Interactive && gitProtocol == "" {
+	var gitProtocol string
+	if opts.Interactive {
 		var proto string
 		err := prompt.SurveyAskOne(&survey.Select{
 			Message: "What is your preferred protocol for Git operations?",
@@ -56,9 +49,11 @@ func Login(opts *LoginOptions) error {
 				"SSH",
 			},
 		}, &proto)
+
 		if err != nil {
 			return fmt.Errorf("could not prompt: %w", err)
 		}
+
 		gitProtocol = strings.ToLower(proto)
 	}
 
@@ -69,13 +64,13 @@ func Login(opts *LoginOptions) error {
 		if err := credentialFlow.Prompt(hostname); err != nil {
 			return err
 		}
+
 		additionalScopes = append(additionalScopes, credentialFlow.Scopes()...)
 	}
 
 	var keyToUpload string
-	keyTitle := defaultSSHKeyTitle
 	if opts.Interactive && gitProtocol == "ssh" {
-		pubKeys, err := opts.sshContext.LocalPublicKeys()
+		pubKeys, err := opts.sshContext.localPublicKeys()
 		if err != nil {
 			return err
 		}
@@ -86,61 +81,39 @@ func Login(opts *LoginOptions) error {
 				Message: "Upload your SSH public key to your GitHub account?",
 				Options: append(pubKeys, "Skip"),
 			}, &keyChoice)
+
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
 			}
+
 			if keyChoice < len(pubKeys) {
 				keyToUpload = pubKeys[keyChoice]
 			}
-		} else if opts.sshContext.HasKeygen() {
-			var sshChoice bool
-			err := prompt.SurveyAskOne(&survey.Confirm{
-				Message: "Generate a new SSH key to add to your GitHub account?",
-				Default: true,
-			}, &sshChoice)
-
+		} else {
+			var err error
+			keyToUpload, err = opts.sshContext.generateSSHKey()
 			if err != nil {
-				return fmt.Errorf("could not prompt: %w", err)
-			}
-
-			if sshChoice {
-				passphrase, err := promptForSshKeyPassphrase()
-				if err != nil {
-					return fmt.Errorf("could not prompt for key passphrase: %w", err)
-				}
-
-				keyPair, err := opts.sshContext.GenerateSSHKey("id_ed25519", passphrase)
-				if err != nil {
-					return err
-				}
-				keyToUpload = keyPair.PublicKeyPath
+				return err
 			}
 		}
+	}
 
-		if keyToUpload != "" {
-			err := prompt.SurveyAskOne(&survey.Input{
-				Message: "Title for your SSH key:",
-				Default: defaultSSHKeyTitle,
-			}, &keyTitle)
-			if err != nil {
-				return fmt.Errorf("could not prompt: %w", err)
-			}
-
-			additionalScopes = append(additionalScopes, "admin:public_key")
-		}
+	if keyToUpload != "" {
+		additionalScopes = append(additionalScopes, "admin:public_key")
 	}
 
 	var authMode int
 	if opts.Web {
 		authMode = 0
-	} else if opts.Interactive {
+	} else {
 		err := prompt.SurveyAskOne(&survey.Select{
-			Message: "How would you like to authenticate GitHub CLI?",
+			Message: "How would you like to authenticate GitHub API?",
 			Options: []string{
 				"Login with a web browser",
 				"Paste an authentication token",
 			},
 		}, &authMode)
+
 		if err != nil {
 			return fmt.Errorf("could not prompt: %w", err)
 		}
@@ -151,11 +124,11 @@ func Login(opts *LoginOptions) error {
 
 	if authMode == 0 {
 		var err error
-		authToken, err = authflow.AuthFlowWithConfig(cfg, opts.IO, hostname, "", append(opts.Scopes, additionalScopes...), opts.Interactive)
+		authToken, err = authflow.AuthFlowWithConfig(cfg, opts.IO, hostname, "", append(opts.Scopes, additionalScopes...))
 		if err != nil {
 			return fmt.Errorf("failed to authenticate via web browser: %w", err)
 		}
-		fmt.Fprintf(opts.IO.ErrOut, "%s Authentication complete.\n", cs.SuccessIcon())
+
 		userValidated = true
 	} else {
 		minimumScopes := append([]string{"repo", "read:org"}, additionalScopes...)
@@ -167,6 +140,7 @@ func Login(opts *LoginOptions) error {
 		err := prompt.SurveyAskOne(&survey.Password{
 			Message: "Paste your authentication token:",
 		}, &authToken, survey.WithValidator(survey.Required))
+
 		if err != nil {
 			return fmt.Errorf("could not prompt: %w", err)
 		}
@@ -187,6 +161,7 @@ func Login(opts *LoginOptions) error {
 		apiClient := api.NewClientFromHTTP(httpClient)
 		var err error
 		username, err = api.CurrentLoginName(apiClient, hostname)
+
 		if err != nil {
 			return fmt.Errorf("error using api: %w", err)
 		}
@@ -198,15 +173,16 @@ func Login(opts *LoginOptions) error {
 	}
 
 	if gitProtocol != "" {
-		fmt.Fprintf(opts.IO.ErrOut, "- gh config set -h %s git_protocol %s\n", hostname, gitProtocol)
+		fmt.Fprintf(opts.IO.ErrOut, "- botway gh-config set --host %s git_protocol %s\n", hostname, gitProtocol)
 		err := cfg.Set(hostname, "git_protocol", gitProtocol)
 		if err != nil {
 			return err
 		}
+
 		fmt.Fprintf(opts.IO.ErrOut, "%s Configured git protocol\n", cs.SuccessIcon())
 	}
 
-	err := cfg.WriteHosts()
+	err := cfg.Write()
 	if err != nil {
 		return err
 	}
@@ -219,28 +195,16 @@ func Login(opts *LoginOptions) error {
 	}
 
 	if keyToUpload != "" {
-		err := sshKeyUpload(httpClient, hostname, keyToUpload, keyTitle)
+		err := sshKeyUpload(httpClient, hostname, keyToUpload)
 		if err != nil {
 			return err
 		}
+
 		fmt.Fprintf(opts.IO.ErrOut, "%s Uploaded the SSH key to your GitHub account: %s\n", cs.SuccessIcon(), cs.Bold(keyToUpload))
 	}
 
 	fmt.Fprintf(opts.IO.ErrOut, "%s Logged in as %s\n", cs.SuccessIcon(), cs.Bold(username))
 	return nil
-}
-
-func promptForSshKeyPassphrase() (string, error) {
-	var sshPassphrase string
-	err := prompt.SurveyAskOne(&survey.Password{
-		Message: "Enter a passphrase for your new SSH key (Optional)",
-	}, &sshPassphrase)
-
-	if err != nil {
-		return "", err
-	}
-
-	return sshPassphrase, nil
 }
 
 func scopesSentence(scopes []string, isEnterprise bool) string {
@@ -252,15 +216,6 @@ func scopesSentence(scopes []string, isEnterprise bool) string {
 			quoted[i] += " (GHE 3.0+)"
 		}
 	}
+
 	return strings.Join(quoted, ", ")
-}
-
-func sshKeyUpload(httpClient *http.Client, hostname, keyFile string, title string) error {
-	f, err := os.Open(keyFile)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	return add.SSHKeyUpload(httpClient, hostname, f, title)
 }

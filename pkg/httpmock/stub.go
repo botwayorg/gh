@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"io/ioutil"
 	"net/http"
-	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -29,7 +29,10 @@ func REST(method, p string) Matcher {
 		if !strings.EqualFold(req.Method, method) {
 			return false
 		}
-		return req.URL.Path == "/"+p
+		if req.URL.Path != "/"+p {
+			return false
+		}
+		return true
 	}
 }
 
@@ -53,29 +56,11 @@ func GraphQL(q string) Matcher {
 	}
 }
 
-func QueryMatcher(method string, path string, query url.Values) Matcher {
-	return func(req *http.Request) bool {
-		if !REST(method, path)(req) {
-			return false
-		}
-
-		actualQuery := req.URL.Query()
-
-		for param := range query {
-			if !(actualQuery.Get(param) == query.Get(param)) {
-				return false
-			}
-		}
-
-		return true
-	}
-}
-
 func readBody(req *http.Request) ([]byte, error) {
 	bodyCopy := &bytes.Buffer{}
 	r := io.TeeReader(req.Body, bodyCopy)
-	req.Body = io.NopCloser(bodyCopy)
-	return io.ReadAll(r)
+	req.Body = ioutil.NopCloser(bodyCopy)
+	return ioutil.ReadAll(r)
 }
 
 func decodeJSONBody(req *http.Request, dest interface{}) error {
@@ -89,17 +74,6 @@ func decodeJSONBody(req *http.Request, dest interface{}) error {
 func StringResponse(body string) Responder {
 	return func(req *http.Request) (*http.Response, error) {
 		return httpResponse(200, req, bytes.NewBufferString(body)), nil
-	}
-}
-
-func WithHeader(responder Responder, header string, value string) Responder {
-	return func(req *http.Request) (*http.Response, error) {
-		resp, _ := responder(req)
-		if resp.Header == nil {
-			resp.Header = make(http.Header)
-		}
-		resp.Header.Set(header, value)
-		return resp, nil
 	}
 }
 
@@ -126,17 +100,6 @@ func FileResponse(filename string) Responder {
 	}
 }
 
-func RESTPayload(responseStatus int, responseBody string, cb func(payload map[string]interface{})) Responder {
-	return func(req *http.Request) (*http.Response, error) {
-		bodyData := make(map[string]interface{})
-		err := decodeJSONBody(req, &bodyData)
-		if err != nil {
-			return nil, err
-		}
-		cb(bodyData)
-		return httpResponse(responseStatus, req, bytes.NewBufferString(responseBody)), nil
-	}
-}
 func GraphQLMutation(body string, cb func(map[string]interface{})) Responder {
 	return func(req *http.Request) (*http.Response, error) {
 		var bodyData struct {
@@ -178,7 +141,7 @@ func ScopesResponder(scopes string) func(*http.Request) (*http.Response, error) 
 			Header: map[string][]string{
 				"X-Oauth-Scopes": {scopes},
 			},
-			Body: io.NopCloser(bytes.NewBufferString("")),
+			Body: ioutil.NopCloser(bytes.NewBufferString("")),
 		}, nil
 	}
 }
@@ -187,7 +150,6 @@ func httpResponse(status int, req *http.Request, body io.Reader) *http.Response 
 	return &http.Response{
 		StatusCode: status,
 		Request:    req,
-		Body:       io.NopCloser(body),
-		Header:     http.Header{},
+		Body:       ioutil.NopCloser(body),
 	}
 }

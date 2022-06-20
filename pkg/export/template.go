@@ -4,15 +4,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math"
 	"strconv"
 	"strings"
 	"text/template"
 	"time"
 
-	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/text"
-	"github.com/cli/cli/v2/utils"
+	"github.com/botwayorg/gh/pkg/iostreams"
+	"github.com/botwayorg/gh/pkg/text"
+	"github.com/botwayorg/gh/utils"
 	"github.com/mgutz/ansi"
 )
 
@@ -42,6 +43,7 @@ func (t *Template) parseTemplate(tpl string) (*template.Template, error) {
 			if err != nil {
 				return "", err
 			}
+
 			return t.Format(format), nil
 		},
 		"timeago": func(input string) (string, error) {
@@ -49,6 +51,7 @@ func (t *Template) parseTemplate(tpl string) (*template.Template, error) {
 			if err != nil {
 				return "", err
 			}
+
 			return timeAgo(now.Sub(t)), nil
 		},
 
@@ -56,15 +59,7 @@ func (t *Template) parseTemplate(tpl string) (*template.Template, error) {
 		"join":        templateJoin,
 		"tablerow":    t.tableRow,
 		"tablerender": t.tableRender,
-		"truncate": func(maxWidth int, v interface{}) (string, error) {
-			if v == nil {
-				return "", nil
-			}
-			if s, ok := v.(string); ok {
-				return text.Truncate(maxWidth, s), nil
-			}
-			return "", fmt.Errorf("invalid value; expected string, got %T", v)
-		},
+		"truncate":    text.Truncate,
 	}
 
 	if !t.io.ColorEnabled() {
@@ -88,7 +83,7 @@ func (t *Template) Execute(input io.Reader) error {
 		t.template = template
 	}
 
-	jsonData, err := io.ReadAll(input)
+	jsonData, err := ioutil.ReadAll(input)
 	if err != nil {
 		return err
 	}
@@ -106,6 +101,7 @@ func ExecuteTemplate(io *iostreams.IOStreams, input io.Reader, template string) 
 	if err := t.Execute(input); err != nil {
 		return err
 	}
+
 	return t.End()
 }
 
@@ -133,6 +129,7 @@ func (t *Template) color(colorName string, input interface{}) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	return ansi.Color(text, colorName), nil
 }
 
@@ -142,6 +139,7 @@ func templatePluck(field string, input []interface{}) []interface{} {
 		obj := item.(map[string]interface{})
 		results = append(results, obj[field])
 	}
+
 	return results
 }
 
@@ -152,8 +150,10 @@ func templateJoin(sep string, input []interface{}) (string, error) {
 		if err != nil {
 			return "", err
 		}
+
 		results = append(results, text)
 	}
+
 	return strings.Join(results, sep), nil
 }
 
@@ -161,6 +161,7 @@ func (t *Template) tableRow(fields ...interface{}) (string, error) {
 	if t.tablePrinter == nil {
 		t.tablePrinter = utils.NewTablePrinterWithOptions(t.io, utils.TablePrinterOptions{IsTTY: true})
 	}
+
 	for _, e := range fields {
 		s, err := jsonScalarToString(e)
 		if err != nil {
@@ -168,6 +169,7 @@ func (t *Template) tableRow(fields ...interface{}) (string, error) {
 		}
 		t.tablePrinter.AddField(s, text.TruncateColumn, nil)
 	}
+
 	t.tablePrinter.EndRow()
 	return "", nil
 }
@@ -180,6 +182,7 @@ func (t *Template) tableRender() (string, error) {
 			return "", fmt.Errorf("failed to render table: %v", err)
 		}
 	}
+
 	return "", nil
 }
 
@@ -188,6 +191,7 @@ func (t *Template) End() error {
 	if _, err := t.tableRender(); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -195,17 +199,22 @@ func timeAgo(ago time.Duration) string {
 	if ago < time.Minute {
 		return "just now"
 	}
+
 	if ago < time.Hour {
 		return utils.Pluralize(int(ago.Minutes()), "minute") + " ago"
 	}
+
 	if ago < 24*time.Hour {
 		return utils.Pluralize(int(ago.Hours()), "hour") + " ago"
 	}
+
 	if ago < 30*24*time.Hour {
 		return utils.Pluralize(int(ago.Hours())/24, "day") + " ago"
 	}
+
 	if ago < 365*24*time.Hour {
 		return utils.Pluralize(int(ago.Hours())/24/30, "month") + " ago"
 	}
+
 	return utils.Pluralize(int(ago.Hours()/24/365), "year") + " ago"
 }

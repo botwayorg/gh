@@ -3,7 +3,7 @@ package api
 import (
 	"context"
 
-	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/botwayorg/gh/core/ghrepo"
 	"github.com/shurcooL/githubv4"
 )
 

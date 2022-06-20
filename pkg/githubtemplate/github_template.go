@@ -2,7 +2,7 @@ package githubtemplate
 
 import (
 	"fmt"
-	"os"
+	"io/ioutil"
 	"path"
 	"regexp"
 	"sort"
@@ -24,7 +24,7 @@ func FindNonLegacy(rootDir string, name string) []string {
 
 mainLoop:
 	for _, dir := range candidateDirs {
-		files, err := os.ReadDir(dir)
+		files, err := ioutil.ReadDir(dir)
 		if err != nil {
 			continue
 		}
@@ -32,7 +32,7 @@ mainLoop:
 		// detect multiple templates in a subdirectory
 		for _, file := range files {
 			if strings.EqualFold(file.Name(), name) && file.IsDir() {
-				templates, err := os.ReadDir(path.Join(dir, file.Name()))
+				templates, err := ioutil.ReadDir(path.Join(dir, file.Name()))
 				if err != nil {
 					break
 				}
@@ -63,7 +63,7 @@ func FindLegacy(rootDir string, name string) string {
 		path.Join(rootDir, "docs"),
 	}
 	for _, dir := range candidateDirs {
-		files, err := os.ReadDir(dir)
+		files, err := ioutil.ReadDir(dir)
 		if err != nil {
 			continue
 		}
@@ -80,7 +80,7 @@ func FindLegacy(rootDir string, name string) string {
 
 // ExtractName returns the name of the template from YAML front-matter
 func ExtractName(filePath string) string {
-	contents, err := os.ReadFile(filePath)
+	contents, err := ioutil.ReadFile(filePath)
 	frontmatterBoundaries := detectFrontmatter(contents)
 	if err == nil && frontmatterBoundaries[0] == 0 {
 		templateData := struct {
@@ -95,7 +95,7 @@ func ExtractName(filePath string) string {
 
 // ExtractContents returns the template contents without the YAML front-matter
 func ExtractContents(filePath string) []byte {
-	contents, err := os.ReadFile(filePath)
+	contents, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return []byte{}
 	}

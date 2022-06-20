@@ -5,8 +5,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/cli/cli/v2/git"
-	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/botwayorg/gh/core/ghrepo"
+	"github.com/botwayorg/gh/git"
 )
 
 // Remotes represents a set of git remotes
@@ -89,18 +89,15 @@ func (r Remote) RepoHost() string {
 	return r.Repo.RepoHost()
 }
 
-type Translator interface {
-	Translate(*url.URL) *url.URL
-}
-
-func TranslateRemotes(gitRemotes git.RemoteSet, translator Translator) (remotes Remotes) {
+// TODO: accept an interface instead of git.RemoteSet
+func TranslateRemotes(gitRemotes git.RemoteSet, urlTranslate func(*url.URL) *url.URL) (remotes Remotes) {
 	for _, r := range gitRemotes {
 		var repo ghrepo.Interface
 		if r.FetchURL != nil {
-			repo, _ = ghrepo.FromURL(translator.Translate(r.FetchURL))
+			repo, _ = ghrepo.FromURL(urlTranslate(r.FetchURL))
 		}
 		if r.PushURL != nil && repo == nil {
-			repo, _ = ghrepo.FromURL(translator.Translate(r.PushURL))
+			repo, _ = ghrepo.FromURL(urlTranslate(r.PushURL))
 		}
 		if repo == nil {
 			continue
