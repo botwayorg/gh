@@ -1,9 +1,9 @@
 package get_username
 
 import (
-	// "fmt"
+	"fmt"
 
-	// git_config "github.com/botwayorg/git"
+	git_config "github.com/botwayorg/git"
 	"github.com/spf13/cobra"
 )
 
@@ -13,7 +13,7 @@ func GetUsername() *cobra.Command {
 		Args:  cobra.ExactArgs(0),
 		Short: "Get Your Github Username.",
 		Run: func(cmd *cobra.Command, args []string) {
-			// fmt.Println(git_config.GitConfig())
+			fmt.Println(git_config.GitConfig())
 		},
 	}
 

@@ -12,8 +12,8 @@ import (
 	repoSyncCmd "github.com/botwayorg/gh/pkg/cmd/gh-repo/sync"
 	repoViewCmd "github.com/botwayorg/gh/pkg/cmd/gh-repo/view"
 	"github.com/botwayorg/gh/pkg/cmdutil"
-	// "github.com/botwayorg/gh/utils"
-	// git_config "github.com/botwayorg/git"
+	"github.com/botwayorg/gh/utils"
+	git_config "github.com/botwayorg/git"
 	"github.com/spf13/cobra"
 
 	"github.com/botwayorg/gh/pkg/cmd/factory"
@@ -36,15 +36,13 @@ func NewCmdRepo(f *cmdutil.Factory) *cobra.Command {
 			`),
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// username := git_config.GitConfig()
+			username := git_config.GitConfig()
 
-			// if username == ":username" {
-			// 	utils.AuthMessage()
-			// } else {
-			// 	cmd.Help()
-			// }
-
-			cmd.Help()
+			if username == ":username" {
+				utils.AuthMessage()
+			} else {
+				cmd.Help()
+			}
 
 			return nil
 		},

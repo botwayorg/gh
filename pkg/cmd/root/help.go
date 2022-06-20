@@ -167,7 +167,7 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
 
 	helpEntries = append(helpEntries, helpEntry{"LEARN MORE", `
 Use 'botway <command> <subcommand> --help' for more information about a command.
-Read 📚 at https://docs.botway.dev`})
+Read 📚 at https://github.com/abdfnx/botway`})
 	if _, ok := command.Annotations["help:feedback"]; ok {
 		helpEntries = append(helpEntries, helpEntry{"FEEDBACK", command.Annotations["help:feedback"]})
 	}
