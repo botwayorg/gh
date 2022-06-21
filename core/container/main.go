@@ -126,7 +126,7 @@ func mainRun() exitCode {
 
 		var httpErr api.HTTPError
 		if errors.As(err, &httpErr) && httpErr.StatusCode == 401 {
-			fmt.Fprintln(stderr, "hint: try authenticating with `botway login --github`")
+			fmt.Fprintln(stderr, "hint: try authenticating with `botway github login`")
 		}
 
 		return exitError

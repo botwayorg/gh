@@ -19,7 +19,7 @@ var HelpTopics = map[string]map[string]string{
 			  You can run "C:\Program Files\Git\bin\bash.exe" from any terminal emulator to continue
 			  using all of the tooling in Git For Windows without MinTTY.
 
-			- Prefix invocations of botway with winpty, eg: "winpty botway login --github".
+			- Prefix invocations of botway with winpty, eg: "winpty botway github login".
 			  NOTE: this can lead to some UI bugs.
 		`),
 	},

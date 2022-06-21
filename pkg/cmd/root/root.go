@@ -20,7 +20,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		Example: heredoc.Doc(`
-			botway login --github
+			botway github login
 			botway gh-repo clone vercel/turborepo
 		`),
 		Annotations: map[string]string{

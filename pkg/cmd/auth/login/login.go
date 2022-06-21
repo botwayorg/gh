@@ -61,13 +61,13 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 		`, "`"),
 		Example: heredoc.Doc(`
 			# start interactive setup
-			botway login --github
+			botway github login
 
 			# authenticate against github.com by reading the token from a file
-			botway login --github --with-token < mytoken.txt
+			botway github login --with-token < mytoken.txt
 
 			# authenticate with a specific GitHub Enterprise Server instance
-			botway login --github --hostname enterprise.internal
+			botway github login --hostname enterprise.internal
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !opts.IO.CanPrompt() && !(tokenStdin || opts.Web) {
