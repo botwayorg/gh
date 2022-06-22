@@ -8,11 +8,11 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/botwayorg/gh/core/config"
 	"github.com/botwayorg/gh/core/run"
+	"github.com/botwayorg/gh/pkg/cmd/auth/shared/passphrase"
+	"github.com/botwayorg/gh/pkg/cmd/auth/shared/ssh_keys"
 	"github.com/botwayorg/gh/pkg/cmd/ssh-key/add"
-	"github.com/botwayorg/gh/pkg/prompt"
 	"github.com/cli/safeexec"
 )
 
@@ -74,10 +74,8 @@ func (c *sshContext) generateSSHKey() (string, error) {
 	}
 
 	var sshChoice bool
-	err = prompt.SurveyAskOne(&survey.Confirm{
-		Message: "Generate a new SSH key to add to your GitHub account?",
-		Default: true,
-	}, &sshChoice)
+
+	sshChoice, err = ssh_keys.SSHKeys()
 
 	if err != nil {
 		return "", fmt.Errorf("could not prompt: %w", err)
@@ -103,9 +101,8 @@ func (c *sshContext) generateSSHKey() (string, error) {
 
 	var sshLabel string
 	var sshPassphrase string
-	err = prompt.SurveyAskOne(&survey.Password{
-		Message: "Enter a passphrase for your new SSH key (Optional)",
-	}, &sshPassphrase)
+
+	sshPassphrase, err = passphrase.Passphrase()
 
 	if err != nil {
 		return "", fmt.Errorf("could not prompt: %w", err)

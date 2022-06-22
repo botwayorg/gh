@@ -5,13 +5,15 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/botwayorg/gh/api"
 	"github.com/botwayorg/gh/core/authflow"
 	"github.com/botwayorg/gh/core/ghinstance"
+	"github.com/botwayorg/gh/pkg/cmd/auth/shared/auth_gh_api"
+	"github.com/botwayorg/gh/pkg/cmd/auth/shared/auth_token"
+	"github.com/botwayorg/gh/pkg/cmd/auth/shared/git_protocol"
+	"github.com/botwayorg/gh/pkg/cmd/auth/shared/upload_ssh"
 	"github.com/botwayorg/gh/pkg/iostreams"
-	"github.com/botwayorg/gh/pkg/prompt"
 )
 
 type iconfig interface {
@@ -40,15 +42,12 @@ func Login(opts *LoginOptions) error {
 	cs := opts.IO.ColorScheme()
 
 	var gitProtocol string
+
 	if opts.Interactive {
 		var proto string
-		err := prompt.SurveyAskOne(&survey.Select{
-			Message: "What is your preferred protocol for Git operations?",
-			Options: []string{
-				"HTTPS",
-				"SSH",
-			},
-		}, &proto)
+		var err error
+
+		proto, err = git_protocol.GitProtocol()
 
 		if err != nil {
 			return fmt.Errorf("could not prompt: %w", err)
@@ -60,6 +59,7 @@ func Login(opts *LoginOptions) error {
 	var additionalScopes []string
 
 	credentialFlow := &GitCredentialFlow{Executable: opts.Executable}
+
 	if opts.Interactive && gitProtocol == "https" {
 		if err := credentialFlow.Prompt(hostname); err != nil {
 			return err
@@ -69,6 +69,7 @@ func Login(opts *LoginOptions) error {
 	}
 
 	var keyToUpload string
+
 	if opts.Interactive && gitProtocol == "ssh" {
 		pubKeys, err := opts.sshContext.localPublicKeys()
 		if err != nil {
@@ -77,10 +78,9 @@ func Login(opts *LoginOptions) error {
 
 		if len(pubKeys) > 0 {
 			var keyChoice int
-			err := prompt.SurveyAskOne(&survey.Select{
-				Message: "Upload your SSH public key to your GitHub account?",
-				Options: append(pubKeys, "Skip"),
-			}, &keyChoice)
+			var err error
+
+			keyChoice, err = upload_ssh.UploadSSH(pubKeys)
 
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
@@ -106,13 +106,9 @@ func Login(opts *LoginOptions) error {
 	if opts.Web {
 		authMode = 0
 	} else {
-		err := prompt.SurveyAskOne(&survey.Select{
-			Message: "How would you like to authenticate GitHub API?",
-			Options: []string{
-				"Login with a web browser",
-				"Paste an authentication token",
-			},
-		}, &authMode)
+		var err error
+
+		authMode, err = auth_gh_api.AuthGitHubAPI()
 
 		if err != nil {
 			return fmt.Errorf("could not prompt: %w", err)
@@ -131,15 +127,15 @@ func Login(opts *LoginOptions) error {
 
 		userValidated = true
 	} else {
+		var err error
+
 		minimumScopes := append([]string{"repo", "read:org"}, additionalScopes...)
 		fmt.Fprint(opts.IO.ErrOut, heredoc.Docf(`
 			Tip: you can generate a Personal Access Token here https://%s/settings/tokens
 			The minimum required scopes are %s.
 		`, hostname, scopesSentence(minimumScopes, ghinstance.IsEnterprise(hostname))))
 
-		err := prompt.SurveyAskOne(&survey.Password{
-			Message: "Paste your authentication token:",
-		}, &authToken, survey.WithValidator(survey.Required))
+		authToken, err = auth_token.AuthToken()
 
 		if err != nil {
 			return fmt.Errorf("could not prompt: %w", err)

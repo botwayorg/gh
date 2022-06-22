@@ -6,11 +6,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/botwayorg/gh/core/run"
 	"github.com/botwayorg/gh/git"
-	"github.com/botwayorg/gh/pkg/prompt"
+	"github.com/botwayorg/gh/pkg/cmd/auth/shared/git_creds"
 	"github.com/google/shlex"
 )
 
@@ -23,16 +22,16 @@ type GitCredentialFlow struct {
 }
 
 func (flow *GitCredentialFlow) Prompt(hostname string) error {
+	var err error
+
 	flow.helper, _ = gitCredentialHelper(hostname)
+
 	if isOurCredentialHelper(flow.helper) {
 		flow.scopes = append(flow.scopes, "workflow")
 		return nil
 	}
 
-	err := prompt.SurveyAskOne(&survey.Confirm{
-		Message: "Authenticate Git with your GitHub credentials?",
-		Default: true,
-	}, &flow.shouldSetup)
+	flow.shouldSetup, err = git_creds.GitCreds()
 
 	if err != nil {
 		return fmt.Errorf("could not prompt: %w", err)

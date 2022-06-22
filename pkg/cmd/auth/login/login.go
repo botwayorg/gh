@@ -5,16 +5,17 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/botwayorg/gh/core/config"
 	"github.com/botwayorg/gh/core/ghinstance"
+	"github.com/botwayorg/gh/pkg/cmd/auth/login/host"
+	re_auth "github.com/botwayorg/gh/pkg/cmd/auth/login/re-auth"
 	"github.com/botwayorg/gh/pkg/cmd/auth/shared"
 	"github.com/botwayorg/gh/pkg/cmdutil"
 	"github.com/botwayorg/gh/pkg/iostreams"
-	"github.com/botwayorg/gh/pkg/prompt"
 	"github.com/spf13/cobra"
 )
 
@@ -80,10 +81,13 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 
 			if tokenStdin {
 				defer opts.IO.In.Close()
+
 				token, err := ioutil.ReadAll(opts.IO.In)
+
 				if err != nil {
 					return fmt.Errorf("failed to read token from STDIN: %w", err)
 				}
+
 				opts.Token = strings.TrimSpace(string(token))
 			}
 
@@ -121,15 +125,19 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 
 func loginRun(opts *LoginOptions) error {
 	cfg, err := opts.Config()
+
 	if err != nil {
 		return err
 	}
 
 	hostname := opts.Hostname
+
 	if hostname == "" {
 		if opts.Interactive {
 			var err error
-			hostname, err = promptForHostname()
+
+			hostname, err = host.Host()
+
 			if err != nil {
 				return err
 			}
@@ -140,21 +148,25 @@ func loginRun(opts *LoginOptions) error {
 
 	if err := cfg.CheckWriteable(hostname, "oauth_token"); err != nil {
 		var roErr *config.ReadOnlyEnvError
+
 		if errors.As(err, &roErr) {
 			fmt.Fprintf(opts.IO.ErrOut, "The value of the %s environment variable is being used for authentication.\n", roErr.Variable)
 			fmt.Fprint(opts.IO.ErrOut, "To have botway store credentials instead, first clear the value from the environment.\n")
 			return cmdutil.SilentError
 		}
+
 		return err
 	}
 
 	httpClient, err := opts.HttpClient()
+
 	if err != nil {
 		return err
 	}
 
 	if opts.Token != "" {
 		err := cfg.Set(hostname, "oauth_token", opts.Token)
+
 		if err != nil {
 			return err
 		}
@@ -167,20 +179,19 @@ func loginRun(opts *LoginOptions) error {
 	}
 
 	existingToken, _ := cfg.Get(hostname, "oauth_token")
+
 	if existingToken != "" && opts.Interactive {
 		if err := shared.HasMinimumScopes(httpClient, hostname, existingToken); err == nil {
 			var keepGoing bool
-			err = prompt.SurveyAskOne(&survey.Confirm{
-				Message: fmt.Sprintf(
-					"You're already logged into %s. Do you want to re-authenticate?",
-					hostname),
-				Default: false,
-			}, &keepGoing)
+
+			keepGoing, err = re_auth.ReAuth(hostname)
+
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
 			}
+
 			if !keepGoing {
-				return nil
+				os.Exit(0)
 			}
 		}
 	}
@@ -195,33 +206,4 @@ func loginRun(opts *LoginOptions) error {
 		Scopes:      opts.Scopes,
 		Executable:  opts.MainExecutable,
 	})
-}
-
-func promptForHostname() (string, error) {
-	var hostType int
-	err := prompt.SurveyAskOne(&survey.Select{
-		Message: "What account do you want to log into?",
-		Options: []string{
-			"GitHub.com",
-			"GitHub Enterprise Server",
-		},
-	}, &hostType)
-
-	if err != nil {
-		return "", fmt.Errorf("could not prompt: %w", err)
-	}
-
-	isEnterprise := hostType == 1
-
-	hostname := ghinstance.Default()
-	if isEnterprise {
-		err := prompt.SurveyAskOne(&survey.Input{
-			Message: "GHE hostname:",
-		}, &hostname, survey.WithValidator(ghinstance.HostnameValidator))
-		if err != nil {
-			return "", fmt.Errorf("could not prompt: %w", err)
-		}
-	}
-
-	return hostname, nil
 }
