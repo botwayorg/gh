@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/botwayorg/gh/api"
 	"github.com/botwayorg/gh/core/config"
+	"github.com/botwayorg/gh/pkg/cmd/auth/logout/choose"
+	"github.com/botwayorg/gh/pkg/cmd/auth/logout/confirm"
 	"github.com/botwayorg/gh/pkg/cmdutil"
 	"github.com/botwayorg/gh/pkg/iostreams"
-	"github.com/botwayorg/gh/pkg/prompt"
 	"github.com/spf13/cobra"
 )
 
@@ -85,10 +85,7 @@ func logoutRun(opts *LogoutOptions) error {
 		if len(candidates) == 1 {
 			hostname = candidates[0]
 		} else {
-			err = prompt.SurveyAskOne(&survey.Select{
-				Message: "What account do you want to log out of?",
-				Options: candidates,
-			}, &hostname)
+			hostname, err = choose.Choose(candidates)
 
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
@@ -137,11 +134,8 @@ func logoutRun(opts *LogoutOptions) error {
 	}
 
 	if opts.IO.CanPrompt() {
-		var keepGoing bool
-		err := prompt.SurveyAskOne(&survey.Confirm{
-			Message: fmt.Sprintf("Are you sure you want to log out of %s%s?", hostname, usernameStr),
-			Default: true,
-		}, &keepGoing)
+		keepGoing, err := confirm.ConfirmLogout(hostname, usernameStr)
+
 		if err != nil {
 			return fmt.Errorf("could not prompt: %w", err)
 		}

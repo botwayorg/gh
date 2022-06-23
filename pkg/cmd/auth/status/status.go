@@ -71,7 +71,7 @@ func statusRun(opts *StatusOptions) error {
 	hostnames, err := cfg.Hosts()
 	if len(hostnames) == 0 || err != nil {
 		fmt.Fprintf(stderr,
-			"You are not logged into any GitHub hosts. Run %s to authenticate.\n", cs.Bold("gh auth login"))
+			"You are not logged into any GitHub hosts. Run %s to authenticate.\n", cs.Bold("botway github login"))
 		return cmdutil.SilentError
 	}
 
@@ -111,7 +111,7 @@ func statusRun(opts *StatusOptions) error {
 				addMsg("- The %s token in %s is no longer valid.", cs.Bold(hostname), tokenSource)
 				if tokenIsWriteable {
 					addMsg("- To re-authenticate, run: %s %s",
-						cs.Bold("gh auth login -h"), cs.Bold(hostname))
+						cs.Bold("botway github login -h"), cs.Bold(hostname))
 					addMsg("- To forget about this host, run: %s %s",
 						cs.Bold("gh auth logout -h"), cs.Bold(hostname))
 				}

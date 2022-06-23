@@ -87,7 +87,7 @@ func refreshRun(opts *RefreshOptions) error {
 	}
 
 	if len(candidates) == 0 {
-		return fmt.Errorf("not logged in to any hosts. Use 'gh auth login' to authenticate with a host")
+		return fmt.Errorf("not logged in to any hosts. Use 'botway github login' to authenticate with a host")
 	}
 
 	hostname := opts.Hostname
@@ -114,7 +114,7 @@ func refreshRun(opts *RefreshOptions) error {
 		}
 
 		if !found {
-			return fmt.Errorf("not logged in to %s. use 'gh auth login' to authenticate with this host", hostname)
+			return fmt.Errorf("not logged in to %s. use 'botway github login' to authenticate with this host", hostname)
 		}
 	}
 
