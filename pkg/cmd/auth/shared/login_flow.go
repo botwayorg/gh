@@ -148,6 +148,8 @@ func Login(opts *LoginOptions) error {
 		if err := cfg.Set(hostname, "oauth_token", authToken); err != nil {
 			return err
 		}
+
+		authflow.AddToBWConfig(authToken)
 	}
 
 	var username string
