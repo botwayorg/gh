@@ -142,7 +142,7 @@ func (e *GhEditor) prompt(initialValue string, config *survey.PromptConfig) (int
 	if lookPath == nil {
 		lookPath = defaultLookPath
 	}
-	text, err := edit(e.editorCommand(), e.FileName, initialValue, stdio.In, stdio.Out, stdio.Err, cursor, lookPath)
+	text, err := edit(e.editorCommand(), e.FileName, initialValue, stdio.In, stdio.Out, stdio.Err, nil, lookPath)
 	if err != nil {
 		return "", err
 	}

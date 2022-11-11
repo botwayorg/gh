@@ -4,15 +4,18 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strings"
 
+	"github.com/abdfnx/botway/constants"
 	"github.com/botwayorg/gh/api"
 	"github.com/botwayorg/gh/core/ghinstance"
 	"github.com/botwayorg/gh/pkg/cmdutil"
 	"github.com/botwayorg/gh/pkg/iostreams"
 	"github.com/cli/oauth"
+	"github.com/tidwall/sjson"
 )
 
 var (
@@ -25,6 +28,22 @@ var (
 type iconfig interface {
 	Set(string, string, string) error
 	Write() error
+}
+
+func AddToBWConfig(token string) {
+	botTypeContent, _ := sjson.Set(string(constants.BotwayConfig), "user.gh_token", token)
+
+	remove := os.Remove(constants.BotwayConfigFile)
+
+	if remove != nil {
+		log.Fatal(remove)
+	}
+
+	newBotConfig := os.WriteFile(constants.BotwayConfigFile, []byte(botTypeContent), 0644)
+
+	if newBotConfig != nil {
+		panic(newBotConfig)
+	}
 }
 
 func AuthFlowWithConfig(cfg iconfig, IO *iostreams.IOStreams, hostname, notice string, additionalScopes []string) (string, error) {
@@ -44,6 +63,8 @@ func AuthFlowWithConfig(cfg iconfig, IO *iostreams.IOStreams, hostname, notice s
 	}
 
 	err = cfg.Set(hostname, "oauth_token", token)
+
+	AddToBWConfig(token)
 
 	if err != nil {
 		return "", err
