@@ -31,18 +31,20 @@ type iconfig interface {
 }
 
 func AddToBWConfig(token string) {
-	botTypeContent, _ := sjson.Set(string(constants.BotwayConfig), "user.gh_token", token)
+	if _, err := os.Stat(constants.BotwayConfigFile); err == nil {
+		botTypeContent, _ := sjson.Set(string(constants.BotwayConfig), "user.gh_token", token)
 
-	remove := os.Remove(constants.BotwayConfigFile)
+		remove := os.Remove(constants.BotwayConfigFile)
 
-	if remove != nil {
-		log.Fatal(remove)
-	}
+		if remove != nil {
+			log.Fatal(remove)
+		}
 
-	newBotConfig := os.WriteFile(constants.BotwayConfigFile, []byte(botTypeContent), 0644)
+		newBotConfig := os.WriteFile(constants.BotwayConfigFile, []byte(botTypeContent), 0644)
 
-	if newBotConfig != nil {
-		panic(newBotConfig)
+		if newBotConfig != nil {
+			panic(newBotConfig)
+		}
 	}
 }
 
